@@ -27,5 +27,14 @@ run-docker-migration:
 	MONGO_COLLECTION_NAME=patients \
 	uv run main.py
 
+test:
+	CSV_PATH=../Data/healthcare_dataset.csv \
+	MONGO_MODE=local \
+	MONGO_DB_NAME=healthcare_test \
+	MONGO_COLLECTION_NAME=patients_test \
+	uv run pytest
+
+
 run-users-init-local:
 	mongo mongodb://localhost:27017/admin --username root --password root_password ../migration_mongodb/mongo-init/mongo-init.js
+
