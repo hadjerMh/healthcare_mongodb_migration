@@ -1,28 +1,28 @@
 """
-Script de migration très simple du CSV vers MongoDB.
+Migration script from CSV to MongoDB.
 
-- Lit le fichier CSV.
-- Transforme les lignes en documents Python.
-- Insère tous les documents dans une collection MongoDB.
+- Reads the CSV file.
+- Transforms rows into Python documents.
+- Inserts all documents into a MongoDB collection.
 
-Il peut fonctionner :
-- avec un MongoDB installé localement (mongod sur localhost:27017) ;
-- ou avec un MongoDB dans Docker (port 27017 exposé).
+It can run:
+- against a locally installed MongoDB (mongod on localhost:27017); or
+- against MongoDB running in Docker (port 27017 exposed).
 
-Configuration par variables d'environnement :
-- CSV_PATH : chemin du fichier CSV (défaut ../Data/healthcare_dataset.csv)
-- MONGO_URI : URI de MongoDB (si non défini, une valeur par défaut est choisie selon MONGO_MODE)
-- MONGO_DB_NAME : nom de la base (défaut healthcare)
-- MONGO_COLLECTION_NAME : nom de la collection (défaut patients)
-- MONGO_MODE : "local" (défaut) ou "docker" pour adapter le MONGO_URI par défaut.
+Configuration via environment variables:
+- CSV_PATH: path to the CSV file (default ../Data/healthcare_dataset.csv)
+- MONGO_URI: MongoDB URI (if not set, a default value is chosen based on MONGO_MODE)
+- MONGO_DB_NAME: database name (default healthcare)
+- MONGO_COLLECTION_NAME: collection name (default patients)
+- MONGO_MODE: "local" (default) or "docker" to adapt the default MONGO_URI.
 
-Ce script intègre aussi la logique de création d'utilisateurs / rôles
-équivalente à celle du fichier mongo-init/mongo-init.js :
-- data_ingestor : rôle readWrite sur la base healthcare ;
-- data_analyst : rôle read sur la base healthcare ;
-- admin : rôle dbAdmin sur la base healthcare.
-La création réussira uniquement si l'utilisateur de connexion MongoDB
-dispose des droits suffisants; sinon les erreurs sont simplement affichées.
+This script also includes the user/role creation logic
+equivalent to the mongo-init/mongo-init.js file:
+- data_ingestor: readWrite role on the healthcare database;
+- data_analyst: read role on the healthcare database;
+- admin: dbAdmin role on the healthcare database.
+User creation only succeeds if the MongoDB connection user
+has sufficient privileges; otherwise the errors are simply printed.
 """
 
 import os
@@ -40,14 +40,15 @@ def get_config():
 
     mode = os.getenv("MONGO_MODE", "local").lower()
 
-    # Valeur par défaut du MONGO_URI selon le mode, sauf si l'utilisateur fournit explicitement MONGO_URI.
+    # Default value for MONGO_URI depending on the mode,
+    # unless the user explicitly provides MONGO_URI.
     if "MONGO_URI" in os.environ:
         mongo_uri = os.environ["MONGO_URI"]
     elif mode == "docker":
-        # Exemple : MongoDB dans Docker exposé sur localhost:27017 avec utilisateur applicatif.
-        mongo_uri = "mongodb://app_ingestor:ingestor_password@localhost:27017/healthcare?authSource=admin"
+        # MongoDB running in Docker exposed on localhost:27017 without authentication.
+        mongo_uri = "mongodb://localhost:27017"
     else:
-        # Mode local : mongod installé sur la machine sans authentification particulière.
+        # Local mode: mongod installed on the host without authentication.
         mongo_uri = "mongodb://localhost:27017"
 
     db_name = os.getenv("MONGO_DB_NAME", "healthcare")
@@ -57,15 +58,15 @@ def get_config():
 
 def ensure_app_users(client, db_name: str) -> None:
     """
-    Recrée la logique de mongo-init/mongo-init.js directement en Python.
+    Recreates the logic of mongo-init/mongo-init.js directly in Python.
 
-    Crée 3 utilisateurs dans la base cible :
-    - data_ingestor : readWrite
-    - data_analyst : read
-    - admin : dbAdmin
+    Creates 3 users in the target database:
+    - data_ingestor: readWrite
+    - data_analyst: read
+    - admin: dbAdmin
 
-    Si les utilisateurs existent déjà ou que les droits sont insuffisants,
-    on affiche simplement le message et on continue.
+    If the users already exist or if privileges are insufficient,
+    the error message is simply printed and the script continues.
     """
     db = client[db_name]
 
@@ -97,14 +98,14 @@ def ensure_app_users(client, db_name: str) -> None:
             )
             print(f"Utilisateur MongoDB créé : {u['user']}")
         except Exception as exc:  # noqa: BLE001
-            # Le cas le plus fréquent : l'utilisateur existe déjà ou pas assez de droits
-            print(f"Impossible de créer l'utilisateur {u['user']} ({exc}). Suite du script.")
+            # Most common case: user already exists or insufficient privileges
+            print(f"Unable to create MongoDB user {u['user']} ({exc}). Continuing script.")
 
 
 def row_to_document(row):
-    """Convertit une ligne du CSV en document MongoDB sans beaucoup de vérifications."""
+    """Convert a CSV row into a MongoDB document with minimal validation."""
+
     return {
-        
         "name": str(row["Name"]),
         "age": int(row["Age"]),
         "gender": str(row["Gender"]),
@@ -126,25 +127,25 @@ def row_to_document(row):
 def migrate():
     csv_path, mongo_uri, db_name, collection_name = get_config()
 
-    print(f"Lecture du CSV : {csv_path}")
+    print(f"Reading CSV: {csv_path}")
     df = pd.read_csv(csv_path)
 
-    print(f"Connexion à MongoDB : {mongo_uri}")
+    print(f"Connecting to MongoDB: {mongo_uri}")
     client = MongoClient(mongo_uri)
 
-    # Création des utilisateurs / rôles (équivalent mongo-init.js) si possible.
+    # Create users/roles (equivalent to mongo-init.js) if possible.
     ensure_app_users(client, db_name)
 
     collection = client[db_name][collection_name]
 
-    print(f"Conversion de {len(df)} lignes en documents…")
+    print(f"Converting {len(df)} rows to documents…")
     documents = [row_to_document(row) for _, row in df.iterrows()]
 
-    print(f"Insertion de {len(documents)} documents dans {db_name}.{collection_name}…")
+    print(f"Inserting {len(documents)} documents into {db_name}.{collection_name}…")
     if documents:
         collection.insert_many(documents)
 
-    print("Migration terminée.")
+    print("Migration finished.")
     client.close()
 
 

@@ -1,19 +1,12 @@
-version: "3.9"
+#version: "3.9"
 
 services:
   mongo:
     image: mongo:7.0
     container_name: mongo-healthcare
     restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
-      MONGO_INITDB_DATABASE: healthcare
     ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-      - ./mongo-init/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - "27017:27017" # expose default MongoDB port
 
   migration:
     build: .

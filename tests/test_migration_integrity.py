@@ -32,9 +32,13 @@ def migration_result(monkeypatch):
     """
     client = _mongo_client()
 
-    # Configure main.py to use a dedicated test DB / collection
-    monkeypatch.setenv("CSV_PATH", "../Data/healthcare_dataset.csv")
-    monkeypatch.setenv("MONGO_MODE", "local")
+    # Configure main.py to use a dedicated test DB / collection.
+    # CSV_PATH and MONGO_MODE can be overridden from the environment (e.g. in Docker).
+    csv_path = os.getenv("CSV_PATH", "../Data/healthcare_dataset.csv")
+    mongo_mode = os.getenv("MONGO_MODE", "local")
+
+    monkeypatch.setenv("CSV_PATH", csv_path)
+    monkeypatch.setenv("MONGO_MODE", mongo_mode)
     monkeypatch.setenv("MONGO_DB_NAME", TEST_DB_NAME)
     monkeypatch.setenv("MONGO_COLLECTION_NAME", TEST_COLLECTION_NAME)
 

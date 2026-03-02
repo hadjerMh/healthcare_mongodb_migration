@@ -1,31 +1,31 @@
-## Migration du dataset médical vers MongoDB
+## Migration of the medical dataset to MongoDB
 
-Ce projet contient :
+This project contains:
 
-- **un script Python** qui migre le dataset de données médicales (CSV) vers **MongoDB** ;
-- **une configuration Docker / Docker Compose** pour exécuter MongoDB et le script de migration de manière portable ;
-- **une description du schéma de données**, du système d’authentification et des rôles utilisateurs ;
-- **des contrôles d’intégrité automatisés** avant et après migration.
-
----
-
-### 1. Contexte
-
-Un client du domaine médical dispose d’un important fichier CSV contenant les informations d’hospitalisation de ses patients. Les traitements quotidiens sur ce CSV deviennent difficiles à faire évoluer et à scaler.
-
-L’objectif est de :
-
-- migrer ces données vers **MongoDB** (base NoSQL orientée documents, plus adaptée à la scalabilité horizontale) ;
-- encapsuler la base et les scripts dans des conteneurs **Docker** ;
-- préparer le terrain pour un déploiement futur sur le cloud (AWS).
+- **a Python script** that migrates the medical dataset (CSV) to **MongoDB**;
+- **a Docker / Docker Compose configuration** to run MongoDB and the migration script in a portable way;
+- **a description of the data schema**, the authentication system, and user roles;
+- **automated integrity checks** before and after migration.
 
 ---
 
-### 2. Schéma de la base de données MongoDB
+### 1. Context
 
-Les données sont stockées dans la base `healthcare`, dans la collection `patients`.
+A healthcare client has a large CSV file containing patient hospitalization information. Daily processing on this CSV is becoming hard to evolve and scale.
 
-Exemple de document final :
+The goals are to:
+
+- migrate this data to **MongoDB** (a document‑oriented NoSQL database, better suited for horizontal scalability);
+- encapsulate the database and scripts in **Docker** containers;
+- lay the groundwork for future deployment to the cloud (AWS).
+
+---
+
+### 2. MongoDB database schema
+
+Data is stored in database `healthcare`, collection `patients`.
+
+Example of a final document:
 
 ```json
 {
@@ -49,7 +49,7 @@ Exemple de document final :
 }
 ```
 
-**Correspondance colonnes CSV → champs MongoDB :**
+**Mapping: CSV columns → MongoDB fields**
 
 - `Name` → `name` (string normalisée)
 - `Age` → `age` (int)
@@ -66,71 +66,71 @@ Exemple de document final :
 - `Discharge Date` → `discharge_date` (ISODate)
 - `Medication` → `medication` (string)
 - `Test Results` → `test_results` (string)
-- métadonnées techniques → `_source`
+‑ technical metadata → `_source`
 
-**Index créés :**
+**Indexes created:**
 
 - `idx_medical_condition` : `{ medical_condition: 1 }`
 - `idx_doctor_date` : `{ doctor: 1, date_of_admission: -1 }`
-- `idx_hospital_date` : `{ hospital: 1, date_of_admission: -1 }`
+‑ `idx_hospital_date`: `{ hospital: 1, date_of_admission: -1 }`
 
-Ces index facilitent les requêtes typiques :
+These indexes make the typical queries easier:
 
-- patients par pathologie ;
-- patients par médecin et date ;
-- patients par hôpital et date.
+- patients by medical condition;
+- patients by doctor and date;
+- patients by hospital and date.
 
 ---
 
-### 3. Système d’authentification et rôles utilisateurs
+### 3. Authentication system and user roles
 
-L’authentification MongoDB est activée dans le conteneur via les variables d’environnement :
+If MongoDB authentication is enabled in the container, it can be configured via environment variables such as:
 
 - `MONGO_INITDB_ROOT_USERNAME=admin`
 - `MONGO_INITDB_ROOT_PASSWORD=admin_password`
 - `MONGO_INITDB_DATABASE=healthcare`
 
-Les utilisateurs applicatifs peuvent être créés de deux façons complémentaires :
+Application users can be created in two complementary ways:
 
-- automatiquement au démarrage du conteneur via `mongo-init/mongo-init.js` ;
-- ou dynamiquement par le script `main.py` (fonction `ensure_app_users`) si l’utilisateur de connexion a les droits suffisants.
+- automatically at container startup via `mongo-init/mongo-init.js`;
+- or dynamically by the `main.py` script (function `ensure_app_users`) if the connection user has sufficient privileges.
 
-Les utilisateurs cibles sont :
+Target users:
 
-- **`data_ingestor`** (mot de passe `ingestor_password`)
-  - rôle : `readWrite` sur la base `healthcare`
-  - usage : exécution du script de migration et des traitements d’ingestion.
-- **`data_analyst`** (mot de passe `analyst_password`)
-  - rôle : `read` sur la base `healthcare`
-  - usage : accès en lecture seule (tableaux de bord, data analyst, etc.).
-- **`admin`** (mot de passe `admin`)
-  - rôle : `dbAdmin` sur la base `healthcare`
-  - usage : administration fonctionnelle de la base (index, statistiques, etc.).
+- **`data_ingestor`** (password `ingestor_password`)
+  - role: `readWrite` on database `healthcare`
+  - usage: running the migration script and ingestion jobs.
+- **`data_analyst`** (password `analyst_password`)
+  - role: `read` on database `healthcare`
+  - usage: read‑only access (dashboards, data analysts, etc.).
+- **`admin`** (password `admin`)
+  - role: `dbAdmin` on database `healthcare`
+  - usage: functional administration of the database (indexes, stats, etc.).
 
-> **Remarque sécurité** : dans un contexte réel, ces mots de passe doivent être :
-> - stockés dans un gestionnaire de secrets (AWS Secrets Manager, Vault, etc.) ;
-> - fournis au runtime via des variables d’environnement sécurisées, et non versionnés en clair dans Git.
+> **Security note**: in a real‑world context, these passwords should:
+> - be stored in a secret manager (AWS Secrets Manager, Vault, etc.);
+> - be provided at runtime via secure environment variables, not committed in clear text to Git.
 
 ---
 
-### 4. Installation locale (sans Docker)
+### 4. Local installation (without Docker)
 
-#### 4.1. Prérequis
+#### 4.1. Prerequisites
 
 - Python 3.12+
-- Gestionnaire de dépendances `uv` (`pip install uv` ou binaire officiel)
-- MongoDB installé en local (par défaut sur `mongodb://localhost:27017`)
+- Dependency manager `uv` (`pip install uv` or official binary)
+- MongoDB installed locally (by default on `mongodb://localhost:27017`)
 
-#### 4.2. Création de l’environnement avec `uv`
+#### 4.2. Create the environment with `uv`
 
 ```bash
 cd migration_mongodb
 uv sync --no-dev
 ```
 
-#### 4.3. Variables d’environnement (optionnel)
+#### 4.3. Environment variables (optional)
 
-Vous pouvez définir dans un fichier `.env` (non versionné) :
+You can define them in a `.env` file (not committed):
 
 ```bash
 CSV_PATH=../Data/healthcare_dataset.csv
@@ -139,15 +139,15 @@ MONGO_DB_NAME=healthcare
 MONGO_COLLECTION_NAME=patients
 ```
 
-#### 4.4. Lancer la migration en local
+#### 4.4. Run the migration locally
 
-Avec `uv` directement :
+With `uv` directly:
 
 ```bash
 uv run main.py
 ```
 
-Ou via la cible `Makefile` prévue :
+Or via the provided `Makefile` target:
 
 ```bash
 make run-local
@@ -155,40 +155,40 @@ make run-local
 
 ---
 
-### 5. Utilisation avec Docker / Docker Compose
+### 5. Usage with Docker / Docker Compose
 
-#### 5.1. Prérequis
+#### 5.1. Prerequisites
 
 - Docker
 - Docker Compose
 
-#### 5.2. Lancer MongoDB et la migration
+#### 5.2. Start MongoDB and the migration
 
-Depuis le dossier `migration_mongodb` :
+From the `migration_mongodb` folder:
 
 ```bash
 docker compose up --build
 ```
 
-Cela va :
+This will:
 
-- démarrer un conteneur `mongo-healthcare` avec MongoDB et création de la base / des utilisateurs (`admin`, `data_ingestor`, `data_analyst`) ;
-- construire un conteneur `migration-healthcare` qui :
-  - monte le dataset CSV (`../Data/healthcare_dataset.csv`) sous `/data` ;
-  - exécute `uv run main.py` ;
-  - insère les données dans `healthcare.patients` ;
-  - crée les utilisateurs applicatifs si besoin ;
-  - log la migration.
+- start a `mongo-healthcare` container with MongoDB and create the database/users (depending on your auth config);
+- build a `migration-healthcare` container that:
+  - mounts the CSV dataset (`../Data/healthcare_dataset.csv`) under `/data`;
+  - runs `uv run main.py`;
+  - inserts data into `healthcare.patients`;
+  - creates application users if needed;
+  - logs the migration.
 
-#### 5.3. Accès à MongoDB dans le conteneur
+#### 5.3. Access MongoDB inside the container
 
-Depuis l’hôte :
+From the host:
 
 ```bash
 docker exec -it mongo-healthcare mongosh -u admin -p admin_password --authenticationDatabase admin healthcare
 ```
 
-Exemples de commandes :
+Example commands:
 
 ```javascript
 db.patients.countDocuments();
@@ -198,30 +198,30 @@ db.patients.find({ medical_condition: "Diabetes" }).limit(5);
 
 ---
 
-### 6. Contrôles d’intégrité automatisés
+### 6. Automated integrity checks
 
-Le script `main.py` effectue :
+The `main.py` script performs:
 
-- **Avant migration :**
-  - comptage des lignes ;
-  - détection des valeurs manquantes par colonne ;
-  - comptage des lignes dupliquées ;
-  - inspection des types pandas.
-- **Pendant la migration :**
-  - transformation typée des colonnes (int, float, date, chaîne) ;
-  - insertion par lot (`batch_size`) pour de meilleures performances.
-- **Après migration :**
-  - comptage du nombre de documents insérés dans MongoDB ;
-  - comparaison avec le nombre de lignes du CSV ;
-  - création des index.
+- **Before migration:**
+  - row count;
+  - detection of missing values per column;
+  - count of duplicate rows;
+  - inspection of pandas dtypes.
+- **During migration:**
+  - typed transformation of columns (int, float, date, string);
+  - batch insertion (`batch_size`) for better performance.
+- **After migration:**
+  - counting the number of documents inserted into MongoDB;
+  - comparison with the number of CSV rows;
+  - index creation.
 
-Les résultats sont visibles dans les logs (console ou logs du conteneur Docker).
+Results are visible in the logs (console or Docker container logs).
 
 ---
 
-### 7. Commandes CRUD de base (exemples)
+### 7. Basic CRUD commands (examples)
 
-Une fois la migration effectuée, voici quelques exemples de commandes MongoDB (`mongosh`) :
+Once the migration is done, here are some example MongoDB (`mongosh`) commands:
 
 ```javascript
 // Create
@@ -246,18 +246,18 @@ db.patients.deleteOne({ name: "Test Patient" });
 
 ---
 
-### 8. Pistes de déploiement sur AWS (résumé)
+### 8. AWS deployment options (summary)
 
-Plusieurs options existent pour déployer MongoDB et les traitements associés sur AWS :
+Several options exist for deploying MongoDB and the related processing on AWS:
 
-- **Amazon EC2 + Docker / MongoDB auto-géré**
-  - Vous déployez vous‑même MongoDB dans des instances EC2.
+- **Amazon EC2 + Docker / self‑managed MongoDB**
+  - You deploy MongoDB yourself on EC2 instances.
 - **Amazon ECS / Fargate**
-  - Orchestration de conteneurs (MongoDB + service d’ingestion Python) à partir du `Dockerfile` et du `docker-compose.yml` actuels (à adapter en tâches ECS).
+  - Container orchestration (MongoDB + Python ingestion service) using the current `Dockerfile` and `docker-compose.yml` (adapted into ECS tasks).
 - **Amazon S3**
-  - Stockage des fichiers sources (CSV, exports, backups) de manière durable et peu coûteuse.
-- **Amazon DocumentDB (compatibilité MongoDB)**
-  - Service managé compatible API MongoDB, alternative à MongoDB auto‑géré pour bénéficier de la haute disponibilité et des sauvegardes automatiques.
+  - Storage for source files (CSV, exports, backups) in a durable and cost‑effective way.
+- **Amazon DocumentDB (MongoDB compatibility)**
+  - Managed service compatible with the MongoDB API, an alternative to self‑managed MongoDB to benefit from high availability and automatic backups.
 
 Une présentation PowerPoint (non incluse ici) détaillera le contexte, la démarche technique et la justification de ces choix.
 
