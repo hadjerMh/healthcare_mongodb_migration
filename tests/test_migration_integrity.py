@@ -15,7 +15,7 @@ import main as migration_main
 
 
 TEST_DB_NAME = "healthcare_test"
-TEST_COLLECTION_NAME = "patients_test"
+TEST_PATIENT_COLLECTION_NAME = "patients_test"
 
 
 def _mongo_client() -> MongoClient:
@@ -27,8 +27,8 @@ def _mongo_client() -> MongoClient:
 @pytest.fixture()
 def migration_result(monkeypatch):
     """
-    Run one migration into a test DB/collection.
-    Returns (collection, source_dataframe).
+    Run one migration into a test patients collection.
+    Returns (patients_collection, source_dataframe).
     """
     client = _mongo_client()
 
@@ -40,10 +40,10 @@ def migration_result(monkeypatch):
     monkeypatch.setenv("CSV_PATH", csv_path)
     monkeypatch.setenv("MONGO_MODE", mongo_mode)
     monkeypatch.setenv("MONGO_DB_NAME", TEST_DB_NAME)
-    monkeypatch.setenv("MONGO_COLLECTION_NAME", TEST_COLLECTION_NAME)
+    monkeypatch.setenv("MONGO_COLLECTION_NAME", TEST_PATIENT_COLLECTION_NAME)
 
-    collection = client[TEST_DB_NAME][TEST_COLLECTION_NAME]
-    collection.drop()
+    patients_collection = client[TEST_DB_NAME][TEST_PATIENT_COLLECTION_NAME]
+    patients_collection.drop()
 
     # Run the real migration
     migration_main.migrate()
@@ -51,7 +51,7 @@ def migration_result(monkeypatch):
     csv_path, _, _, _ = migration_main.get_config()
     df = pd.read_csv(csv_path)
 
-    yield collection, df
+    yield patients_collection, df
 
     # Cleanup
     client.drop_database(TEST_DB_NAME)
@@ -60,28 +60,40 @@ def migration_result(monkeypatch):
 
 def test_row_count_matches_csv(migration_result):
     """Same number of documents in Mongo as rows in the CSV."""
-    collection, df = migration_result
-    assert collection.count_documents({}) == len(df)
+    patients_collection, df = migration_result
+    assert patients_collection.count_documents({}) == len(df)
 
 
 def test_collection_not_empty(migration_result):
     """At least one document has been inserted."""
-    collection, _ = migration_result
-    assert collection.count_documents({}) > 0
+    patients_collection, _ = migration_result
+    assert patients_collection.count_documents({}) > 0
 
 
 def test_document_has_expected_fields(migration_result):
     """A sample document contains all expected fields."""
-    collection, _ = migration_result
-    doc = collection.find_one()
+    patients_collection, _ = migration_result
+    doc = patients_collection.find_one()
     assert doc is not None
 
-    expected_fields = {
+    # Check top-level structure
+    assert "patient" in doc
+    assert "hospital" in doc
+
+    patient = doc["patient"]
+    hospital = doc["hospital"]
+
+    expected_patient_fields = {
         "name",
         "age",
         "gender",
         "blood_type",
         "medical_condition",
+        "medication",
+        "test_results",
+    }
+
+    expected_hospital_fields = {
         "date_of_admission",
         "doctor",
         "hospital",
@@ -90,18 +102,16 @@ def test_document_has_expected_fields(migration_result):
         "room_number",
         "admission_type",
         "discharge_date",
-        "medication",
-        "test_results",
     }
 
-    document_fields = set(doc.keys()) - {"_id"}
-    assert expected_fields.issubset(document_fields)
+    assert expected_patient_fields.issubset(set(patient.keys()))
+    assert expected_hospital_fields.issubset(set(hospital.keys()))
 
 
 def test_first_50_documents_share_same_keys(migration_result):
     """First 50 documents have the same key set (schema consistency)."""
-    collection, _ = migration_result
-    docs = list(collection.find().limit(50))
+    patients_collection, _ = migration_result
+    docs = list(patients_collection.find().limit(50))
     assert docs, "No documents found"
 
     base_keys = set(docs[0].keys())
@@ -111,6 +121,7 @@ def test_first_50_documents_share_same_keys(migration_result):
 
 def test_no_null_name_field(migration_result):
     """No document has a null 'name'."""
-    collection, _ = migration_result
-    assert collection.count_documents({"name": None}) == 0
+    patients_collection, _ = migration_result
+    # Check nested field patient.name
+    assert patients_collection.count_documents({"patient.name": None}) == 0
 

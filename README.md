@@ -25,54 +25,61 @@ The goals are to:
 
 Data is stored in database `healthcare`, collection `patients`.
 
+Each document is **nested** into two sub-documents:
+
+- `patient`: information about the patient;
+- `hospital`: information about the hospitalization context.
+
 Example of a final document:
 
 ```json
 {
   "_id": ObjectId("..."),
-  "name": "Bobby Jackson",
-  "age": 30,
-  "gender": "Male",
-  "blood_type": "B-",
-  "medical_condition": "Cancer",
-  "date_of_admission": ISODate("2024-01-31T00:00:00Z"),
-  "doctor": "Matthew Smith",
-  "hospital": "Sons and Miller",
-  "insurance_provider": "Blue Cross",
-  "billing_amount": 18856.28,
-  "room_number": 328,
-  "admission_type": "Urgent",
-  "discharge_date": ISODate("2024-02-02T00:00:00Z"),
-  "medication": "Paracetamol",
-  "test_results": "Normal",
-  "_source": "csv_healthcare_dataset"
+  "patient": {
+    "name": "Bobby Jackson",
+    "age": 30,
+    "gender": "Male",
+    "blood_type": "B-",
+    "medical_condition": "Cancer",
+    "medication": "Paracetamol",
+    "test_results": "Normal"
+  },
+  "hospital": {
+    "date_of_admission": ISODate("2024-01-31T00:00:00Z"),
+    "doctor": "Matthew Smith",
+    "hospital": "Sons and Miller",
+    "insurance_provider": "Blue Cross",
+    "billing_amount": 18856.28,
+    "room_number": 328,
+    "admission_type": "Urgent",
+    "discharge_date": ISODate("2024-02-02T00:00:00Z")
+  }
 }
 ```
 
 **Mapping: CSV columns → MongoDB fields**
 
-- `Name` → `name` (string normalisée)
-- `Age` → `age` (int)
-- `Gender` → `gender` (string)
-- `Blood Type` → `blood_type` (string)
-- `Medical Condition` → `medical_condition` (string)
-- `Date of Admission` → `date_of_admission` (ISODate)
-- `Doctor` → `doctor` (string)
-- `Hospital` → `hospital` (string)
-- `Insurance Provider` → `insurance_provider` (string)
-- `Billing Amount` → `billing_amount` (float)
-- `Room Number` → `room_number` (int)
-- `Admission Type` → `admission_type` (string)
-- `Discharge Date` → `discharge_date` (ISODate)
-- `Medication` → `medication` (string)
-- `Test Results` → `test_results` (string)
-‑ technical metadata → `_source`
+- `Name` → `patient.name` (string)
+- `Age` → `patient.age` (int)
+- `Gender` → `patient.gender` (string)
+- `Blood Type` → `patient.blood_type` (string)
+- `Medical Condition` → `patient.medical_condition` (string)
+- `Medication` → `patient.medication` (string)
+- `Test Results` → `patient.test_results` (string)
+- `Date of Admission` → `hospital.date_of_admission` (ISODate)
+- `Doctor` → `hospital.doctor` (string)
+- `Hospital` → `hospital.hospital` (string)
+- `Insurance Provider` → `hospital.insurance_provider` (string)
+- `Billing Amount` → `hospital.billing_amount` (float)
+- `Room Number` → `hospital.room_number` (int)
+- `Admission Type` → `hospital.admission_type` (string)
+- `Discharge Date` → `hospital.discharge_date` (ISODate)
 
-**Indexes created:**
+**Indexes created (on nested fields):**
 
-- `idx_medical_condition` : `{ medical_condition: 1 }`
-- `idx_doctor_date` : `{ doctor: 1, date_of_admission: -1 }`
-‑ `idx_hospital_date`: `{ hospital: 1, date_of_admission: -1 }`
+- `idx_medical_condition` : `{ "patient.medical_condition": 1 }`
+- `idx_doctor_date` : `{ "hospital.doctor": 1, "hospital.date_of_admission": -1 }`
+‑ `idx_hospital_date`: `{ "hospital.hospital": 1, "hospital.date_of_admission": -1 }`
 
 These indexes make the typical queries easier:
 

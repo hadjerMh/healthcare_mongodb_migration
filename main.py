@@ -102,25 +102,63 @@ def ensure_app_users(client, db_name: str) -> None:
             print(f"Unable to create MongoDB user {u['user']} ({exc}). Continuing script.")
 
 
+def _as_str(value) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value)
+
+
+def _as_int(value) -> int:
+    if pd.isna(value):
+        return 0
+    return int(value)
+
+
+def _as_float(value) -> float:
+    if pd.isna(value):
+        return 0.0
+    return float(value)
+
+
+def _as_date(value) -> datetime:
+    """
+    Parse date values coming from CSV/pandas into a Python datetime.
+    Accepts 'YYYY-MM-DD' strings or pandas/py datetime-like values.
+    """
+    if pd.isna(value):
+        # Keep a stable type; downstream code can treat this as "missing".
+        return datetime(1970, 1, 1)
+    if isinstance(value, datetime):
+        return value
+    # pandas Timestamp supports to_pydatetime()
+    if hasattr(value, "to_pydatetime"):
+        return value.to_pydatetime()
+    return datetime.strptime(str(value), "%Y-%m-%d")
+
+
 def row_to_document(row):
     """Convert a CSV row into a MongoDB document with minimal validation."""
 
     return {
-        "name": str(row["Name"]),
-        "age": int(row["Age"]),
-        "gender": str(row["Gender"]),
-        "blood_type": row["Blood Type"],
-        "medical_condition": str(row["Medical Condition"]),
-        "date_of_admission": datetime.strptime(row["Date of Admission"], "%Y-%m-%d"),
-        "doctor": row["Doctor"],
-        "hospital": str(row["Hospital"]),
-        "insurance_provider": row["Insurance Provider"],
-        "billing_amount": float(row["Billing Amount"]),
-        "room_number": row["Room Number"],
-        "admission_type": str(row["Admission Type"]),
-        "discharge_date": datetime.strptime(row["Discharge Date"], "%Y-%m-%d"),
-        "medication": row["Medication"],
-        "test_results": str(row["Test Results"]),
+        "patient": {
+            "name": _as_str(row["Name"]).strip(),
+            "age": _as_int(row["Age"]),
+            "gender": _as_str(row["Gender"]),
+            "blood_type": _as_str(row["Blood Type"]),
+            "medical_condition": _as_str(row["Medical Condition"]),
+            "medication": _as_str(row["Medication"]),
+            "test_results": _as_str(row["Test Results"]),
+        },
+        "hospital": {
+            "date_of_admission": _as_date(row["Date of Admission"]),
+            "doctor": _as_str(row["Doctor"]),
+            "hospital": _as_str(row["Hospital"]),
+            "insurance_provider": _as_str(row["Insurance Provider"]),
+            "billing_amount": _as_float(row["Billing Amount"]),
+            "room_number": _as_int(row["Room Number"]),
+            "admission_type": _as_str(row["Admission Type"]),
+            "discharge_date": _as_date(row["Discharge Date"]),
+        },
     }
 
 
