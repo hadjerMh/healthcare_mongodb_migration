@@ -266,5 +266,3 @@ Several options exist for deploying MongoDB and the related processing on AWS:
 - **Amazon DocumentDB (MongoDB compatibility)**
   - Managed service compatible with the MongoDB API, an alternative to self‑managed MongoDB to benefit from high availability and automatic backups.
 
-Une présentation PowerPoint (non incluse ici) détaillera le contexte, la démarche technique et la justification de ces choix.
-

@@ -1,4 +1,4 @@
-#version: "3.9"
+version: "3.9"
 
 services:
   mongo:
@@ -6,7 +6,11 @@ services:
     container_name: mongo-healthcare
     restart: unless-stopped
     ports:
-      - "27017:27017" # expose default MongoDB port
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - healthcare-network
 
   migration:
     build: .
@@ -16,12 +20,18 @@ services:
     environment:
       CSV_PATH: /data/healthcare_dataset.csv
       MONGO_MODE: docker
+      MONGO_URI: mongodb://mongo:27017
       MONGO_DB_NAME: healthcare
       MONGO_COLLECTION_NAME: patients
     volumes:
       - ../Data:/data:ro
     command: ["uv", "run", "main.py"]
+    networks:
+      - healthcare-network
 
 volumes:
   mongo_data:
 
+networks:
+  healthcare-network:
+    driver: bridge

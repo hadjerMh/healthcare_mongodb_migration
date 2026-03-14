@@ -70,20 +70,34 @@ def ensure_app_users(client, db_name: str) -> None:
     """
     db = client[db_name]
 
+    # Passwords are only read from environment variables; no secrets are stored in code.
+    ingestor_pwd = os.getenv("MONGO_DATA_INGESTOR_PASSWORD")
+    analyst_pwd = os.getenv("MONGO_DATA_ANALYST_PASSWORD")
+    admin_pwd = os.getenv("MONGO_APP_ADMIN_PASSWORD")
+
+    if not all([ingestor_pwd, analyst_pwd, admin_pwd]):
+        print(
+            "Skipping application user creation: "
+            "one or more of MONGO_DATA_INGESTOR_PASSWORD, "
+            "MONGO_DATA_ANALYST_PASSWORD or MONGO_APP_ADMIN_PASSWORD "
+            "is not set in the environment."
+        )
+        return
+
     users_to_create = [
         {
             "user": "data_ingestor",
-            "pwd": "ingestor_password",
+            "pwd": ingestor_pwd,
             "roles": [{"role": "readWrite", "db": db_name}],
         },
         {
             "user": "data_analyst",
-            "pwd": "analyst_password",
+            "pwd": analyst_pwd,
             "roles": [{"role": "read", "db": db_name}],
         },
         {
             "user": "admin",
-            "pwd": "admin",
+            "pwd": admin_pwd,
             "roles": [{"role": "dbAdmin", "db": db_name}],
         },
     ]
@@ -171,7 +185,7 @@ def migrate():
     print(f"Connecting to MongoDB: {mongo_uri}")
     client = MongoClient(mongo_uri)
 
-    # Create users/roles (equivalent to mongo-init.js) if possible.
+    # Create users/roles
     ensure_app_users(client, db_name)
 
     collection = client[db_name][collection_name]
